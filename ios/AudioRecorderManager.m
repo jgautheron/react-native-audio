@@ -22,13 +22,13 @@ NSString *const AudioRecorderEventFinished = @"recordingFinished";
 
   NSTimeInterval _currentTime;
   id _progressUpdateTimer;
-  int _progressUpdateInterval;
   NSDate *_prevProgressUpdateTime;
   NSURL *_audioFileURL;
   NSNumber *_audioQuality;
   NSNumber *_audioEncoding;
   NSNumber *_audioChannels;
   NSNumber *_audioSampleRate;
+  NSNumber *_progressUpdateInterval;
   AVAudioSession *_recordSession;
   BOOL _meteringEnabled;
   BOOL _measurementMode;
@@ -54,10 +54,8 @@ RCT_EXPORT_MODULE();
           [_audioRecorder updateMeters];
           float _currentMetering = [_audioRecorder averagePowerForChannel: 0];
           [body setObject:[NSNumber numberWithFloat:_currentMetering] forKey:@"currentMetering"];
-   
-          float _currentPeakMetering = [_audioRecorder peakPowerForChannel:0];
-          [body setObject:[NSNumber numberWithFloat:_currentPeakMetering] forKey:@"currentPeakMetering"];
       }
+
       [self.bridge.eventDispatcher sendAppEventWithName:AudioRecorderEventProgress body:body];
 
     _prevProgressUpdateTime = [NSDate date];
@@ -69,13 +67,12 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)startProgressTimer {
-  _progressUpdateInterval = 250;
   //_prevProgressUpdateTime = nil;
 
   [self stopProgressTimer];
 
   _progressUpdateTimer = [CADisplayLink displayLinkWithTarget:self selector:@selector(sendProgressUpdate)];
-  [_progressUpdateTimer addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+  [_progressUpdateTimer addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
 }
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
@@ -84,27 +81,13 @@ RCT_EXPORT_MODULE();
     NSData *data = [NSData dataWithContentsOfFile:_audioFileURL];
     base64 = [data base64EncodedStringWithOptions:0];
   }
-    uint64_t audioFileSize = 0;
-    audioFileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:[_audioFileURL path] error:nil] fileSize];
-  
+
   [self.bridge.eventDispatcher sendAppEventWithName:AudioRecorderEventFinished body:@{
       @"base64":base64,
       @"duration":@(_currentTime),
       @"status": flag ? @"OK" : @"ERROR",
-      @"audioFileURL": [_audioFileURL absoluteString],
-      @"audioFileSize": @(audioFileSize)
+      @"audioFileURL": [_audioFileURL absoluteString]
     }];
-    
-    // This will resume the music/audio file that was playing before the recording started
-    // Without this piece of code, the music/audio will just be stopped
-    NSError *error;
-    [[AVAudioSession sharedInstance] setActive:NO
-                                   withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
-                                         error:&error];
-    if (error) {
-        // TODO: dispatch error over the bridge
-        NSLog(@"error: %@", [error localizedDescription]);
-    }
 }
 
 - (NSString *) applicationDocumentsDirectory
@@ -114,7 +97,7 @@ RCT_EXPORT_MODULE();
   return basePath;
 }
 
-RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)sampleRate channels:(nonnull NSNumber *)channels quality:(NSString *)quality encoding:(NSString *)encoding meteringEnabled:(BOOL)meteringEnabled measurementMode:(BOOL)measurementMode includeBase64:(BOOL)includeBase64)
+RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)sampleRate channels:(nonnull NSNumber *)channels quality:(NSString *)quality encoding:(NSString *)encoding meteringEnabled:(BOOL)meteringEnabled measurementMode:(BOOL)measurementMode includeBase64:(BOOL)includeBase64 progressUpdateInterval:(nonnull NSNumber *)progressUpdateInterval)
 {
   _prevProgressUpdateTime = nil;
   [self stopProgressTimer];
@@ -125,6 +108,7 @@ RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)samp
   _audioQuality = [NSNumber numberWithInt:AVAudioQualityHigh];
   _audioEncoding = [NSNumber numberWithInt:kAudioFormatAppleIMA4];
   _audioChannels = [NSNumber numberWithInt:2];
+  _progressUpdateInterval = [NSNumber numberWithInt:100];
   _audioSampleRate = [NSNumber numberWithFloat:44100.0];
   _meteringEnabled = NO;
   _includeBase64 = NO;
@@ -194,6 +178,10 @@ RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)samp
 
   if (includeBase64) {
     _includeBase64 = includeBase64;
+  }
+
+  if (progressUpdateInterval) {
+    _progressUpdateInterval = progressUpdateInterval;
   }
 
   NSError *error = nil;
