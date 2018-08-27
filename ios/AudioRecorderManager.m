@@ -47,7 +47,7 @@ RCT_EXPORT_MODULE();
   }
 
   if (_prevProgressUpdateTime == nil ||
-   (([_prevProgressUpdateTime timeIntervalSinceNow] * -1000.0) >= _progressUpdateInterval)) {
+   (([_prevProgressUpdateTime timeIntervalSinceNow] * -1000.0) >= [_progressUpdateInterval doubleValue])) {
       NSMutableDictionary *body = [[NSMutableDictionary alloc] init];
       [body setObject:[NSNumber numberWithFloat:_currentTime] forKey:@"currentTime"];
       if (_meteringEnabled) {
