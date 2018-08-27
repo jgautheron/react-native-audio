@@ -40,7 +40,8 @@ var AudioRecorder = {
       MeteringEnabled: false,
       MeasurementMode: false,
       AudioEncodingBitRate: 32000,
-      IncludeBase64: false
+      IncludeBase64: false,
+      ProgressUpdateInterval: 100
     };
 
     var recordingOptions = {...defaultOptions, ...options};
@@ -73,21 +74,7 @@ var AudioRecorder = {
     return AudioRecorderManager.stopRecording();
   },
   checkAuthorizationStatus: AudioRecorderManager.checkAuthorizationStatus,
-  requestAuthorization: () => {
-    if (Platform.OS === 'ios')
-      return AudioRecorderManager.requestAuthorization();
-    else
-      return new Promise((resolve, reject) => {
-        PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
-        ).then(result => {
-          if (result == PermissionsAndroid.RESULTS.GRANTED || result == true)
-            resolve(true);
-          else
-            resolve(false)
-        })
-      });
-  },
+  requestAuthorization: AudioRecorderManager.requestAuthorization,
   removeListeners: function() {
     if (this.progressSubscription) this.progressSubscription.remove();
     if (this.finishedSubscription) this.finishedSubscription.remove();
